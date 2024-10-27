@@ -24,75 +24,86 @@ const client = new MongoClient(uri, {
   },
 });
 
-
+// Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
   const token = req.headers["authorization"]?.split(" ")[1]; // Get token from header
   if (!token) {
     return res.sendStatus(403); // Forbidden if no token
   }
-  
+
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.sendStatus(403); // Forbidden if token is invalid
     }
-    req.user = decoded; 
+    req.user = decoded;
     next();
   });
 };
 
-// Generate a token 
+// Route to generate a token
 app.get('/generate-token', (req, res) => {
   const token = jwt.sign({ data: 'trusted-user' }, JWT_SECRET, { expiresIn: '1h' });
   res.send({ token });
 });
 
+// Main function to connect to MongoDB and define API routes
 async function run() {
   try {
     await client.connect();
     const contactsCollection = client.db('cmaDB').collection('contacts');
 
-    // Get all contacts
+    // Get all contacts (Protected Route)
     app.get('/contacts', verifyToken, async (req, res) => {
       const result = await contactsCollection.find().toArray();
       res.send(result);
     });
 
-    // Add a new contact
+    // Add a new contact (Protected Route)
     app.post('/contacts', verifyToken, async (req, res) => {
       const contactInfo = req.body;
+
+      // Check if the email already exists
+      const existingContact = await contactsCollection.findOne({ email: contactInfo.email });
+      if (existingContact) {
+        return res.status(400).send({ message: "Email already exists" });
+      }
+
       const result = await contactsCollection.insertOne(contactInfo);
       res.send(result);
     });
 
-    // Update a contact 
+    // Update a contact (Protected Route)
     app.put('/contacts/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const updatedContact = req.body;
       const filter = { _id: new ObjectId(id) };
-      const updateDoc = {
-        $set: updatedContact,
-      };
+      const updateDoc = { $set: updatedContact };
+
       const result = await contactsCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
 
-    // Delete a contact
+    // Delete a contact (Protected Route)
     app.delete('/contacts/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
+
       const result = await contactsCollection.deleteOne(filter);
       res.send(result);
     });
 
+    // Verify connection to MongoDB
     await client.db("admin").command({ ping: 1 });
     console.log("Successfully connected to MongoDB!");
-  } finally {
-    
+  } catch (error) {
+    console.error(error);
   }
 }
+
+// Initialize the MongoDB connection and start the server
 run().catch(console.dir);
 
-// Basic route
+// Basic route to check server status
 app.get('/', (req, res) => {
   res.send('Server is Running');
 });
