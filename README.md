@@ -20,7 +20,7 @@ This is the backend for the Contact Management App, built using Node.js and Expr
 ## Setup
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/contact-management-app-backend.git
+   git clone https://github.com/galibmia/contact-management-server
    cd contact-management-app-backend
    ```
 
